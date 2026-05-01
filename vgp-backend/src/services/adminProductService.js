@@ -43,7 +43,17 @@ exports.listProducts = async ({ page = 1, limit = 20, search, category, subcateg
   if (voucherId) {
     const Voucher = require('../models/Voucher');
     const v = await Voucher.findById(voucherId).lean();
-    if (v) filter.productCode = { $in: v.products };
+    if (v) {
+      if (v.applyTo === 'all') {
+        // no extra filter — every product qualifies
+      } else if (v.applyTo === 'categories') {
+        const catFilter = { category: { $in: v.categories } };
+        const explicitFilter = v.products.length ? { productCode: { $in: v.products } } : null;
+        filter.$or = explicitFilter ? [catFilter, explicitFilter] : [catFilter];
+      } else {
+        filter.productCode = { $in: v.products };
+      }
+    }
   }
 
   const [products, total] = await Promise.all([
@@ -67,7 +77,11 @@ exports.createProduct = async (data) => {
 };
 
 exports.updateProduct = async (code, data) => {
-  if (data.name) data.slug = toSlug(data.name, code);
+  const effectiveCode = data.productCode || code;
+  if (data.name || data.productCode) {
+    const name = data.name || (await Product.findOne({ productCode: code }).select('name').lean())?.name || '';
+    data.slug = toSlug(name, effectiveCode);
+  }
   return Product.findOneAndUpdate(
     { productCode: code },
     { $set: data },
@@ -96,7 +110,17 @@ exports.exportProducts = async ({ search, category, subcategory, minPrice, maxPr
   if (voucherId) {
     const Voucher = require('../models/Voucher');
     const v = await Voucher.findById(voucherId).lean();
-    if (v) filter.productCode = { $in: v.products };
+    if (v) {
+      if (v.applyTo === 'all') {
+        // no extra filter
+      } else if (v.applyTo === 'categories') {
+        const catFilter = { category: { $in: v.categories } };
+        const explicitFilter = v.products.length ? { productCode: { $in: v.products } } : null;
+        filter.$or = explicitFilter ? [catFilter, explicitFilter] : [catFilter];
+      } else {
+        filter.productCode = { $in: v.products };
+      }
+    }
   }
 
   return Product.find(filter).sort({ createdAt: -1 }).lean();

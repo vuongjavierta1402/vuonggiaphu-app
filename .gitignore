@@ -1,0 +1,16 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Build output
+vgp-frontend/build/
+vgp-frontend/.env
+vgp-backend/.env
+
+# OS
+.DS_Store
+**/.DS_Store
+
+# Misc
+*.log
+Untitled

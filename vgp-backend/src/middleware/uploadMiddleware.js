@@ -22,14 +22,17 @@ exports.uploadImages = multer({
 
 exports.uploadExcel = multer({
   storage: memStorage,
-  limits: { fileSize: 20 * 1024 * 1024 },
+  limits: { fileSize: 50 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     const ok =
       file.mimetype.includes('spreadsheetml') ||
       file.mimetype.includes('ms-excel') ||
+      file.mimetype === 'text/csv' ||
+      file.mimetype === 'application/csv' ||
       file.originalname.endsWith('.xlsx') ||
-      file.originalname.endsWith('.xls');
-    if (!ok) return cb(new Error('Chỉ chấp nhận file Excel (.xlsx, .xls)'));
+      file.originalname.endsWith('.xls') ||
+      file.originalname.endsWith('.csv');
+    if (!ok) return cb(new Error('Chỉ chấp nhận file Excel (.xlsx, .xls) hoặc CSV (.csv)'));
     cb(null, true);
   },
 });

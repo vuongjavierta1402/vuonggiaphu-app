@@ -1,4 +1,5 @@
 const ExcelJS = require('exceljs');
+const { parse: parseCsv } = require('csv-parse/sync');
 const asyncWrapper = require('../middleware/asyncWrapper');
 const service = require('../services/adminProductService');
 const Voucher = require('../models/Voucher');
@@ -98,51 +99,68 @@ exports.exportProducts = asyncWrapper(async (req, res) => {
   res.end();
 });
 
+const HEADER_MAP = {
+  'productcode': 'productCode', 'mã sp': 'productCode', 'ma sp': 'productCode',
+  'name': 'name', 'tên sp': 'name', 'ten sp': 'name',
+  'price': 'price', 'giá': 'price', 'gia': 'price',
+  'discountprice': 'discountPrice', 'giá sale': 'discountPrice', 'gia sale': 'discountPrice',
+  'brand': 'brand', 'thương hiệu': 'brand', 'thuong hieu': 'brand',
+  'category': 'category', 'danh mục': 'category', 'danh muc': 'category',
+  'subcategory': 'subcategory', 'danh mục con': 'subcategory', 'danh muc con': 'subcategory',
+  'quantity': 'quantity', 'số lượng': 'quantity', 'so luong': 'quantity',
+  'description': 'description', 'mô tả': 'description', 'mo ta': 'description',
+  'images': 'images', 'hình ảnh': 'images', 'hinh anh': 'images',
+  'sale': 'sale',
+  'highlighted': 'highlighted', 'nổi bật': 'highlighted', 'noi bat': 'highlighted',
+  'isdisplay': 'isDisplay', 'hiển thị': 'isDisplay', 'hien thi': 'isDisplay',
+};
+
+const normaliseKey = (raw) => HEADER_MAP[String(raw).trim().toLowerCase()] || String(raw).trim();
+
 exports.importProducts = asyncWrapper(async (req, res) => {
   if (!req.file) {
-    return res.status(400).json({ success: false, error: 'Vui lòng tải lên file Excel' });
+    return res.status(400).json({ success: false, error: 'Vui lòng tải lên file Excel hoặc CSV' });
   }
 
-  const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(req.file.buffer);
-  const sheet = workbook.worksheets[0];
+  const isCsv =
+    req.file.mimetype === 'text/csv' ||
+    req.file.mimetype === 'application/csv' ||
+    req.file.originalname.toLowerCase().endsWith('.csv');
 
-  // First row = headers, normalise to camelCase keys
-  const headerRow = sheet.getRow(1);
-  const headerMap = {
-    'productcode': 'productCode', 'mã sp': 'productCode', 'ma sp': 'productCode',
-    'name': 'name', 'tên sp': 'name', 'ten sp': 'name',
-    'price': 'price', 'giá': 'price', 'gia': 'price',
-    'discountprice': 'discountPrice', 'giá sale': 'discountPrice', 'gia sale': 'discountPrice',
-    'brand': 'brand', 'thương hiệu': 'brand', 'thuong hieu': 'brand',
-    'category': 'category', 'danh mục': 'category', 'danh muc': 'category',
-    'subcategory': 'subcategory', 'danh mục con': 'subcategory', 'danh muc con': 'subcategory',
-    'quantity': 'quantity', 'số lượng': 'quantity', 'so luong': 'quantity',
-    'description': 'description', 'mô tả': 'description', 'mo ta': 'description',
-    'images': 'images', 'hình ảnh': 'images', 'hinh anh': 'images',
-    'sale': 'sale',
-    'highlighted': 'highlighted', 'nổi bật': 'highlighted', 'noi bat': 'highlighted',
-    'isdisplay': 'isDisplay', 'hiển thị': 'isDisplay', 'hien thi': 'isDisplay',
-  };
+  let rows;
 
-  const headers = [];
-  headerRow.eachCell((cell, col) => {
-    const raw = String(cell.value || '').trim().toLowerCase();
-    headers[col - 1] = headerMap[raw] || raw;
-  });
-
-  const rows = [];
-  sheet.eachRow((row, rowNum) => {
-    if (rowNum === 1) return;
-    const obj = {};
-    row.eachCell({ includeEmpty: true }, (cell, col) => {
-      const key = headers[col - 1];
-      if (key) obj[key] = cell.value;
+  if (isCsv) {
+    const records = parseCsv(req.file.buffer, { columns: true, skip_empty_lines: true, trim: true, bom: true });
+    rows = records.map(record => {
+      const obj = {};
+      for (const [k, v] of Object.entries(record)) {
+        obj[normaliseKey(k)] = v;
+      }
+      return obj;
     });
-    if (Object.keys(obj).some(k => obj[k] != null && obj[k] !== '')) {
-      rows.push(obj);
-    }
-  });
+  } else {
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(req.file.buffer);
+    const sheet = workbook.worksheets[0];
+
+    const headers = [];
+    sheet.getRow(1).eachCell((cell, col) => {
+      headers[col - 1] = normaliseKey(cell.value);
+    });
+
+    rows = [];
+    sheet.eachRow((row, rowNum) => {
+      if (rowNum === 1) return;
+      const obj = {};
+      row.eachCell({ includeEmpty: true }, (cell, col) => {
+        const key = headers[col - 1];
+        if (key) obj[key] = cell.value;
+      });
+      if (Object.keys(obj).some(k => obj[k] != null && obj[k] !== '')) {
+        rows.push(obj);
+      }
+    });
+  }
 
   const result = await service.importProducts(rows);
   res.json({ success: true, data: result });
@@ -167,8 +185,22 @@ exports.syncProductVouchers = asyncWrapper(async (req, res) => {
   res.json({ success: true, message: 'Đã cập nhật voucher cho sản phẩm' });
 });
 
-// Get vouchers that include a specific product
+// Get all vouchers with per-product scope and explicit-membership flags
 exports.getProductVouchers = asyncWrapper(async (req, res) => {
-  const vouchers = await Voucher.find({ products: req.params.code }).lean();
-  res.json({ success: true, data: vouchers });
+  const { code } = req.params;
+  const Product = require('../models/Product');
+  const [product, vouchers] = await Promise.all([
+    Product.findOne({ productCode: code }).select('category').lean(),
+    Voucher.find({}).sort({ createdAt: -1 }).lean(),
+  ]);
+
+  const data = vouchers.map(v => {
+    const explicit = v.products.includes(code);
+    let autoApplied = false;
+    if (v.applyTo === 'all') autoApplied = true;
+    else if (v.applyTo === 'categories' && product) autoApplied = v.categories.includes(product.category);
+    return { ...v, explicit, autoApplied };
+  });
+
+  res.json({ success: true, data });
 });

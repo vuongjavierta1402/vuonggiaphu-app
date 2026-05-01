@@ -47,6 +47,13 @@ exports.validatePromo = async (req, res) => {
 
   return res.json({
     success: true,
-    data: { code: voucher.code, discountType: voucher.discountType, discountValue: voucher.discountValue },
+    data: {
+      code:          voucher.code,
+      discountType:  voucher.discountType,
+      discountValue: voucher.discountValue,
+      applyTo:       voucher.applyTo,
+      categories:    voucher.categories,
+      products:      voucher.products,
+    },
   });
 };
