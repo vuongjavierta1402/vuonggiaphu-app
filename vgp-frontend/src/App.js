@@ -26,6 +26,7 @@ import ProductsPage from './admin/pages/ProductsPage';
 import ProductEditPage from './admin/pages/ProductEditPage';
 import CategoriesPage from './admin/pages/CategoriesPage';
 import VouchersPage from './admin/pages/VouchersPage';
+import CustomerNetworkPage from './admin/pages/CustomerNetworkPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -46,6 +47,7 @@ function AdminArea() {
           <Route path="products/:code" element={<ProductEditPage />} />
           <Route path="categories"    element={<CategoriesPage />} />
           <Route path="vouchers"      element={<VouchersPage />} />
+          <Route path="customers"     element={<CustomerNetworkPage />} />
         </Routes>
       </AdminLayout>
     </ProtectedRoute>

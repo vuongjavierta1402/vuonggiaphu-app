@@ -4,6 +4,7 @@ const adminAuth   = require('../controllers/adminAuthController');
 const adminProd   = require('../controllers/adminProductController');
 const adminCat    = require('../controllers/adminCategoryController');
 const adminVoucher = require('../controllers/adminVoucherController');
+const adminCustomer = require('../controllers/adminCustomerController');
 const { uploadImages, uploadExcel } = require('../middleware/uploadMiddleware');
 
 // Public
@@ -38,5 +39,18 @@ router.post('/vouchers',     adminVoucher.createVoucher);
 router.get('/vouchers/:id',  adminVoucher.getVoucher);
 router.put('/vouchers/:id',  adminVoucher.updateVoucher);
 router.delete('/vouchers/:id', adminVoucher.deleteVoucher);
+
+// ── Customers ─────────────────────────────────────────────────────────────────
+router.get('/customers/network',             adminCustomer.getNetwork);
+router.post('/customers/nodes',              adminCustomer.createNode);
+router.put('/customers/nodes/:id',           adminCustomer.updateNode);
+router.delete('/customers/nodes/:id',        adminCustomer.deleteNode);
+router.patch('/customers/nodes/:id/position', adminCustomer.updateNodePosition);
+router.post('/customers/relations',          adminCustomer.createRelation);
+router.put('/customers/relations/:id',       adminCustomer.updateRelation);
+router.delete('/customers/relations/:id',    adminCustomer.deleteRelation);
+router.post('/customers/groups',             adminCustomer.createGroup);
+router.put('/customers/groups/:id',          adminCustomer.updateGroup);
+router.delete('/customers/groups/:id',       adminCustomer.deleteGroup);
 
 module.exports = router;

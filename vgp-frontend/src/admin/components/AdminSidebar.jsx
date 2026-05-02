@@ -4,6 +4,7 @@ const links = [
   { to: '/admin/products',   icon: '📦', label: 'Sản phẩm' },
   { to: '/admin/categories', icon: '🗂️',  label: 'Danh mục' },
   { to: '/admin/vouchers',   icon: '🎟️',  label: 'Voucher' },
+  { to: '/admin/customers',  icon: '🕸️',  label: 'Mạng Khách Hàng' },
 ];
 
 export default function AdminSidebar() {
